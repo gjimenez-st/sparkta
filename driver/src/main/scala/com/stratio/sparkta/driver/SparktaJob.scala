@@ -15,33 +15,52 @@
  * limitations under the License.
  */
 
-package com.stratio.sparkta.driver.service
+package com.stratio.sparkta.driver
 
-import java.io.{File, Serializable}
+import java.io._
 import java.nio.file.{Files, Paths}
+import scala.annotation.tailrec
+import scala.collection.JavaConversions._
+import scala.io.Source
+import scala.util._
 
-import akka.event.slf4j.{Logger, SLF4JLogging}
+import akka.event.slf4j.SLF4JLogging
+import org.apache.commons.io.FileUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.{Duration, StreamingContext}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.reflections.Reflections
+
 import com.stratio.sparkta.aggregator.{Cube, CubeMaker}
 import com.stratio.sparkta.driver.exception.DriverException
 import com.stratio.sparkta.driver.factory.{SchemaFactory, SparkContextFactory}
 import com.stratio.sparkta.driver.models.{AggregationPoliciesModel, OperatorModel}
+import com.stratio.sparkta.driver.service.RawDataStorageService
+import com.stratio.sparkta.driver.util.PolicyUtils
 import com.stratio.sparkta.sdk.TypeOp.TypeOp
 import com.stratio.sparkta.sdk.WriteOp.WriteOp
 import com.stratio.sparkta.sdk._
-import org.apache.commons.io.FileUtils
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.{Duration, StreamingContext}
-import org.reflections.Reflections
-
-import scala.annotation.tailrec
-import scala.collection.JavaConversions._
-import scala.util._
 
 object SparktaJob extends SLF4JLogging {
 
   val baseJars = Seq("driver-plugin.jar", "aggregator-plugin.jar", "sdk-plugin.jar")
+
+  def main(args: Array[String]): Unit = {
+    val file = new Path(s"/user/stratio/${args(0)}.json")
+    val fileSystem = FileSystem.get(new Configuration())
+    val in = fileSystem.open(file)
+    val policyString = Source.fromInputStream(in).getLines.mkString
+    in.close
+    val policy = PolicyUtils.parseJson(policyString)
+    val sc = new SparkContext(new SparkConf().setAppName(s"SPARKTA-${policy.name}"))
+    SparkContextFactory.setSparkContext(sc)
+    runSparktaJob(sc, policy)
+    SparkContextFactory.sparkStreamingInstance.get.start
+    SparkContextFactory.sparkStreamingInstance.get.awaitTermination
+  }
 
   def runSparktaJob(sc: SparkContext, apConfig: AggregationPoliciesModel): Any = {
 
@@ -105,14 +124,14 @@ object SparktaJob extends SLF4JLogging {
             None
           }
         }).flatMap(event => event match {
-            case Some(value) => Seq(value)
-            case None => Seq()
-          }), parsers.drop(1))
+        case Some(value) => Seq(value)
+        case None => Seq()
+      }), parsers.drop(1))
       case None => input
     }
   }
 
-  val getClasspathMap: Map[String, String] = {
+  lazy val getClasspathMap: Map[String, String] = {
     val reflections = new Reflections()
     val inputs = reflections.getSubTypesOf(classOf[Input]).toList
     val dimensionTypes = reflections.getSubTypesOf(classOf[DimensionType]).toList
@@ -138,8 +157,8 @@ object SparktaJob extends SLF4JLogging {
     }).toMap
 
   def input(apConfig: AggregationPoliciesModel, ssc: StreamingContext): (String, DStream[Event]) =
-      (apConfig.input.get.name, tryToInstantiate[Input](apConfig.input.get.`type` + Input.ClassSuffix, (c) =>
-        instantiateParameterizable[Input](c, apConfig.input.get.configuration)).setUp(ssc))
+    (apConfig.input.get.name, tryToInstantiate[Input](apConfig.input.get.`type` + Input.ClassSuffix, (c) =>
+      instantiateParameterizable[Input](c, apConfig.input.get.configuration)).setUp(ssc))
 
   def parsers(apConfig: AggregationPoliciesModel): Seq[Parser] =
     apConfig.transformations.map(parser =>
