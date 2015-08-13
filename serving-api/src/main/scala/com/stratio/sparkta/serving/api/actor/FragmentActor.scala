@@ -18,9 +18,9 @@ package com.stratio.sparkta.serving.api.actor
 
 import akka.actor.Actor
 import akka.event.slf4j.SLF4JLogging
-import com.stratio.sparkta.driver.models.{FragmentElementModel, StreamingContextStatusEnum}
 import com.stratio.sparkta.sdk.JsoneyStringSerializer
 import com.stratio.sparkta.serving.core.AppConstant
+import com.stratio.sparkta.serving.core.models.{FragmentElementModel, StreamingContextStatusEnum}
 import org.apache.curator.framework.CuratorFramework
 import org.apache.zookeeper.KeeperException.NoNodeException
 import org.json4s.DefaultFormats

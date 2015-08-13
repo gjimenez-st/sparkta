@@ -1,4 +1,3 @@
-
 /**
  * Copyright (C) 2015 Stratio (http://stratio.com)
  *
@@ -19,40 +18,49 @@ package com.stratio.sparkta.driver
 
 import java.io._
 import java.nio.file.{Files, Paths}
-import scala.annotation.tailrec
-import scala.collection.JavaConversions._
-import scala.util._
 
 import akka.event.slf4j.SLF4JLogging
-import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.{Duration, StreamingContext}
-import org.apache.spark.{SparkConf, SparkContext}
-import org.reflections.Reflections
-
 import com.stratio.sparkta.aggregator.{Cube, CubeMaker}
 import com.stratio.sparkta.driver.exception.DriverException
 import com.stratio.sparkta.driver.factory.{SchemaFactory, SparkContextFactory}
-import com.stratio.sparkta.driver.models.{AggregationPoliciesModel, OperatorModel}
 import com.stratio.sparkta.driver.service.RawDataStorageService
 import com.stratio.sparkta.driver.util.PolicyUtils
 import com.stratio.sparkta.sdk.TypeOp.TypeOp
 import com.stratio.sparkta.sdk.WriteOp.WriteOp
 import com.stratio.sparkta.sdk._
+import com.stratio.sparkta.serving.core.models.{AggregationPoliciesModel, OperatorModel, StreamingContextStatusEnum}
 import com.stratio.sparkta.serving.core.{AppConstant, CuratorFactoryHolder, SparktaConfig}
+import org.apache.commons.io.FileUtils
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.{Duration, StreamingContext}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.json4s.DefaultFormats
+import org.json4s.ext.EnumNameSerializer
+import org.reflections.Reflections
+
+import scala.annotation.tailrec
+import scala.collection.JavaConversions._
+import scala.util._
 
 object SparktaJob extends SLF4JLogging {
 
   val baseJars = Seq("driver-plugin.jar", "aggregator-plugin.jar", "sdk-plugin.jar")
 
+  implicit val json4sJacksonFormats = DefaultFormats +
+    new EnumNameSerializer(StreamingContextStatusEnum) +
+    new JsoneyStringSerializer()
+
   def main(args: Array[String]): Unit = {
-    val aggregationPoliciesModel: AggregationPoliciesModel = getPolicyFromZookeeper(args(0))
+    val policyName = args(0)
+
+    val aggregationPoliciesModel: AggregationPoliciesModel = getPolicyFromZookeeper(policyName)
 
     val sc = new SparkContext(new SparkConf().setAppName(s"SPARKTA-${aggregationPoliciesModel.name}"))
     SparkContextFactory.setSparkContext(sc)
     runSparktaJob(sc, aggregationPoliciesModel)
     SparkContextFactory.sparkStreamingInstance.get.start
+
     SparkContextFactory.sparkStreamingInstance.get.awaitTermination
   }
 
@@ -65,7 +73,7 @@ object SparktaJob extends SLF4JLogging {
         s"${AppConstant.PoliciesBasePath}/${policyName}")))
     }) match {
       case Success(policy) => policy
-      case Failure(e) => log.error("", e); throw e
+      case Failure(e) => log.error(s"Cannot load policy $policyName", e); throw e
     }
   }
 

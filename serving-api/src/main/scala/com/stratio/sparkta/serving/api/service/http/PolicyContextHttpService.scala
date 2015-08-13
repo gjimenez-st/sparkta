@@ -17,8 +17,8 @@
 package com.stratio.sparkta.serving.api.service.http
 
 import akka.pattern.ask
-import com.stratio.sparkta.driver.models._
 import com.stratio.sparkta.serving.api.actor.StreamingActor._
+import com.stratio.sparkta.serving.core.models._
 import com.stratio.sparkta.serving.api.constants.HttpConstant
 import com.stratio.sparkta.serving.api.helpers.PolicyHelper
 import com.wordnik.swagger.annotations._
