@@ -66,11 +66,11 @@ object SparktaJob extends SLF4JLogging {
 
   def getPolicyFromZookeeper(policyName: String): AggregationPoliciesModel = {
     Try({
-    val configSparkta = SparktaConfig.initConfig(AppConstant.ConfigAppName)
-    val curatorFramework = CuratorFactoryHolder.getInstance(configSparkta).get
+      val configSparkta = SparktaConfig.initConfig(AppConstant.ConfigAppName)
+      val curatorFramework = CuratorFactoryHolder.getInstance(configSparkta).get
 
-    read[AggregationPoliciesModel](new Predef.String(curatorFramework.getData.forPath(
-      s"${AppConstant.PoliciesBasePath}/${policyName}")))}) match {
+      read[AggregationPoliciesModel](new Predef.String(curatorFramework.getData.forPath(
+        s"${AppConstant.PoliciesBasePath}/${policyName}")))}) match {
       case Success(policy) => policy
       case Failure(e) => log.error("", e); throw e
     }
