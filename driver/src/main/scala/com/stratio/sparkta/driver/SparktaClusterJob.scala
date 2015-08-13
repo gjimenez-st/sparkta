@@ -19,20 +19,13 @@ package com.stratio.sparkta.driver
 import com.stratio.sparkta.driver.SparktaJob._
 import com.stratio.sparkta.driver.factory.SparkContextFactory
 import com.stratio.sparkta.driver.util.PolicyUtils
-import com.stratio.sparkta.sdk.JsoneyStringSerializer
-import com.stratio.sparkta.serving.core.{CuratorFactoryHolder, AppConstant, SparktaConfig}
-import com.stratio.sparkta.serving.core.models.{StreamingContextStatusEnum, AggregationPoliciesModel}
+import com.stratio.sparkta.serving.core.models.AggregationPoliciesModel
+import com.stratio.sparkta.serving.core.{AppConstant, CuratorFactoryHolder, SparktaConfig}
 import org.apache.spark.{SparkConf, SparkContext}
-import org.json4s.DefaultFormats
-import org.json4s.ext.EnumNameSerializer
 
 import scala.util.{Failure, Success, Try}
 
 object SparktaClusterJob {
-
-  implicit val json4sJacksonFormats = DefaultFormats +
-    new EnumNameSerializer(StreamingContextStatusEnum) +
-    new JsoneyStringSerializer()
 
   def main(args: Array[String]): Unit = {
     val aggregationPoliciesModel: AggregationPoliciesModel = getPolicyFromZookeeper(args(0))
